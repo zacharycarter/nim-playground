@@ -1,9 +1,9 @@
 import jester, asyncdispatch, os, osproc, strutils, json, threadpool, asyncfile, asyncnet
 
-proc respondOnReady(fv: FlowVar[TaintedString], r: Response) {.async.} =
+proc respondOnReady(fv: FlowVar[TaintedString]): Future[string] {.async.} =
   while true:
     if fv.isReady:
-      discard ^fv
+      echo ^fv
       
       var errorsFile = openAsync("tmp/errors.txt", fmReadWrite)
       var logFile = openAsync("tmp/logfile.txt", fmReadWrite)
@@ -14,10 +14,11 @@ proc respondOnReady(fv: FlowVar[TaintedString], r: Response) {.async.} =
       
       errorsFile.close()
       logFile.close()
+
+      return $ret
       
-      await r.send(Http200, newStringTable(), $ret)
-      r.client.close()
-      break
+
+    await sleepAsync(500)
 
 proc prepareAndCompile(code: string): TaintedString =
   let currentDir = getCurrentDir()
@@ -29,16 +30,15 @@ proc prepareAndCompile(code: string): TaintedString =
     ./docker_timeout.sh 20s -i -t --net=none -v "$1/tmp":/usercode virtual_machine /usercode/script.sh in.nim
     """ % currentDir)
 
-proc compile(resp: Response, code: string) =
+proc compile(resp: Response, code: string): Future[string] =
   let fv = spawn prepareAndCompile(code)
-  asyncCheck respondOnReady(fv, resp)
+  return respondOnReady(fv)
 
 routes:
   post "/compile":
     if not request.formData.hasKey("code"):
       resp Http400, "code missing from requests' form data."
 
-    response.data.action = TCActionRaw
-    response.compile(request.formData["code"].body)
+    resp(Http200, await response.compile(request.formData["code"].body))
 
 runForever()
