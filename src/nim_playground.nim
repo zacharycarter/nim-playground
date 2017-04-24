@@ -35,6 +35,11 @@ proc compile(resp: Response, code: string): Future[string] =
   return respondOnReady(fv)
 
 routes:
+  put "/compile":
+    if not request.formData.hasKey("code"):
+      resp Http400, "code missing from requests' form data."
+
+    resp(Http200, await response.compile(request.formData["code"].body))
   post "/compile":
     if not request.formData.hasKey("code"):
       resp Http400, "code missing from requests' form data."
