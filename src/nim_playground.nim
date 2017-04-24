@@ -1,5 +1,9 @@
 import jester, asyncdispatch, os, osproc, strutils, json, threadpool, asyncfile, asyncnet
 
+type
+  ParsedRequest = object
+    code: string
+
 proc respondOnReady(fv: FlowVar[TaintedString]): Future[string] {.async.} =
   while true:
     if fv.isReady:
@@ -35,15 +39,14 @@ proc compile(resp: Response, code: string): Future[string] =
   return respondOnReady(fv)
 
 routes:
-  put "/compile":
-    if not request.formData.hasKey("code"):
-      resp Http400, "code missing from requests' form data."
-
-    resp(Http200, await response.compile(request.formData["code"].body))
   post "/compile":
-    if not request.formData.hasKey("code"):
-      resp Http400, "code missing from requests' form data."
+    echo request.body
+    let parsed = parseJson(request.body)
+    if getOrDefault(parsed, "code").isNil:
+      resp(Http400, nil)
 
-    resp(Http200, await response.compile(request.formData["code"].body))
+    let parsedRequest = to(parsed, ParsedRequest)
+
+    resp(Http200, @[("Access-Control-Allow-Origin", "*")], await response.compile(parsedRequest.code))
 
 runForever()
