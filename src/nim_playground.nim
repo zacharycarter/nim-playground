@@ -1,4 +1,20 @@
-import jester, asyncdispatch, os, osproc, strutils, json, threadpool, asyncfile, asyncnet
+import jester, asyncdispatch, os, osproc, strutils, json, threadpool, asyncfile, asyncnet, posix, logging
+
+const config_file_name = "conf.json"
+
+
+onSignal(SIGABRT):
+  ## Handle SIGABRT from systemd
+  # Lines printed to stdout will be received by systemd and logged
+  # Start with "<severity>" from 0 to 7
+  echo "<2>Received SIGABRT"
+  quit(1)
+
+
+let conf = parseFile(config_file_name)
+let fl = newFileLogger(conf["log_fname"].str, fmtStr = "$datetime $levelname ")
+fl.addHandler
+
 
 type
   ParsedRequest = object
@@ -40,7 +56,6 @@ proc compile(resp: Response, code: string): Future[string] =
 
 routes:
   post "/compile":
-    echo request.body
     let parsed = parseJson(request.body)
     if getOrDefault(parsed, "code").isNil:
       resp(Http400, nil)
