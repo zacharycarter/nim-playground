@@ -56,12 +56,14 @@ proc compile(resp: Response, code: string): Future[string] =
 
 routes:
   post "/compile":
+    info "HERE1"
     let parsed = parseJson(request.body)
     if getOrDefault(parsed, "code").isNil:
       resp(Http400, nil)
 
     let parsedRequest = to(parsed, ParsedRequest)
-
+    info "HERE2"
     resp(Http200, @[("Access-Control-Allow-Origin", "*")], await response.compile(parsedRequest.code))
 
+info "Starting!"
 runForever()
