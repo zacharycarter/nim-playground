@@ -1,6 +1,11 @@
 import jester, asyncdispatch, os, osproc, strutils, json, threadpool, asyncfile, asyncnet, posix, logging
 
-const config_file_name = "conf.json"
+type
+  Config = object
+    tmpDir: string
+    logFile: string
+
+const configFileName = "conf.json"
 
 
 onSignal(SIGABRT):
@@ -11,10 +16,13 @@ onSignal(SIGABRT):
   quit(1)
 
 
-let conf = parseFile(config_file_name)
-let fl = newFileLogger(conf["log_fname"].str, fmtStr = "$datetime $levelname ")
-fl.addHandler
+var conf = cast[ptr Config](allocShared0(sizeof(Config)))
+let parsedConfig = parseFile(configFileName)
+conf.tmpDir = parsedConfig["tmp_dir"].str
+conf.logFile = parsedConfig["log_fname"].str
 
+let fl = newFileLogger(conf.logFile, fmtStr = "$datetime $levelname ")
+fl.addHandler
 
 type
   ParsedRequest = object
@@ -25,8 +33,8 @@ proc respondOnReady(fv: FlowVar[TaintedString]): Future[string] {.async.} =
     if fv.isReady:
       echo ^fv
       
-      var errorsFile = openAsync("tmp/errors.txt", fmReadWrite)
-      var logFile = openAsync("tmp/logfile.txt", fmReadWrite)
+      var errorsFile = openAsync("$1/errors.txt" % conf.tmpDir, fmReadWrite)
+      var logFile = openAsync("$1/logfile.txt" % conf.tmpDir, fmReadWrite)
       var errors = await errorsFile.readAll()
       var log = await logFile.readAll()
       
@@ -41,14 +49,13 @@ proc respondOnReady(fv: FlowVar[TaintedString]): Future[string] {.async.} =
     await sleepAsync(500)
 
 proc prepareAndCompile(code: string): TaintedString =
-  let currentDir = getCurrentDir()
-  discard existsOrCreateDir("./tmp")
-  copyFileWithPermissions("./test/script.sh", "./tmp/script.sh")
-  writeFile("./tmp/in.nim", code)
+  discard existsOrCreateDir(conf.tmpDir)
+  copyFileWithPermissions("./test/script.sh", "$1/script.sh" % conf.tmpDir)
+  writeFile("$1/in.nim" % conf.tmpDir, code)
 
   execProcess("""
-    ./docker_timeout.sh 20s -i -t --net=none -v "$1/tmp":/usercode virtual_machine /usercode/script.sh in.nim
-    """ % currentDir)
+    ./docker_timeout.sh 20s -i -t --net=none -v "$1":/usercode virtual_machine /usercode/script.sh in.nim
+    """ % conf.tmpDir)
 
 proc compile(resp: Response, code: string): Future[string] =
   let fv = spawn prepareAndCompile(code)
@@ -56,14 +63,13 @@ proc compile(resp: Response, code: string): Future[string] =
 
 routes:
   post "/compile":
-    info "HERE1"
     let parsed = parseJson(request.body)
     if getOrDefault(parsed, "code").isNil:
       resp(Http400, nil)
 
     let parsedRequest = to(parsed, ParsedRequest)
-    info "HERE2"
-    resp(Http200, @[("Access-Control-Allow-Origin", "*")], await response.compile(parsedRequest.code))
+    resp(Http200, @[("Access-Control-Allow-Origin", "*"), ("Access-Control-Allow-Methods", "POST")], await response.compile(parsedRequest.code))
 
 info "Starting!"
 runForever()
+#freeShared(conf)

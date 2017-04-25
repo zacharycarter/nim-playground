@@ -1,3 +1,4 @@
 {
-  "log_fname": "/var/log/nim-playground.log"
+  "log_fname": "/var/log/nim-playground.log",
+  "tmp_dir": "/tmp/nim-playground"
 }
