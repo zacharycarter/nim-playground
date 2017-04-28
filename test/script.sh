@@ -4,6 +4,7 @@ file=$1
 
 exec  1> $"/usercode/logfile.txt"
 exec  2> $"/usercode/errors.txt"
+exec  < /dev/null
 
 chmod 777 /usercode/logfile.txt
 chmod 777 /usercode/errors.txt
