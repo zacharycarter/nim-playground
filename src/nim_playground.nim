@@ -11,9 +11,6 @@ type
   RequestConfig = object
     tmpDir: string
 
-template workaround_create*[T]: ptr T = cast[ptr T](alloc0(sizeof(T)))
-template workaround_createShared*[T]: ptr T = cast[ptr T](allocShared0(sizeof(T)))
-
 const configFileName = "conf.json"
 
 onSignal(SIGABRT):
@@ -23,7 +20,7 @@ onSignal(SIGABRT):
   echo "<2>Received SIGABRT"
   quit(1)
 
-var conf = workaround_createShared[Config]()
+var conf = createShared(Config)
 let parsedConfig = parseFile(configFileName)
 conf.tmpDir = parsedConfig["tmp_dir"].str
 conf.logFile = parsedConfig["log_fname"].str
@@ -67,12 +64,19 @@ proc compile(resp: Response, code: string, requestConfig: ptr RequestConfig): Fu
 
 routes:
   post "/compile":
-    let parsed = parseJson(request.body)
-    if getOrDefault(parsed, "code").isNil:
-      resp(Http400, nil)
+    var parsedRequest: ParsedRequest
 
-    let parsedRequest = to(parsed, ParsedRequest)
-    let requestConfig = workaround_createShared[RequestConfig]()
+    if request.params.len > 0:
+      if request.params.hasKey("code"):
+        parsedRequest.code = request.params["code"]
+        echo parsedRequest.code
+    else:
+      let parsed = parseJson(request.body)
+      if getOrDefault(parsed, "code").isNil:
+        resp(Http400, nil)
+      parsedRequest = to(parsed, ParsedRequest)
+
+    let requestConfig = createShared(RequestConfig)
     requestConfig.tmpDir = conf.tmpDir & "/" & generateUUID()
     let result = await response.compile(parsedRequest.code, requestConfig)
     
