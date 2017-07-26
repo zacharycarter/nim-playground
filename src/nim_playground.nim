@@ -72,6 +72,7 @@ proc createGist(code: string): string =
   let resp = client.request("https://api.github.com/gists", httpMethod = HttpPost, body = $body)
   
   let parsedResponse = parseJson(resp.bodyStream, "response.json")
+  echo repr parsedResponse
   return parsedResponse.getOrDefault("html_url").str
 
 
@@ -89,6 +90,8 @@ routes:
     if getOrDefault(parsed, "code").isNil:
       resp(Http400, nil)
     parsedRequest = to(parsed, ParsedRequest)
+
+    echo repr parsedRequest
     
     resp(Http200, @[("Access-Control-Allow-Origin", "*"), ("Access-Control-Allow-Methods", "POST")], createGist(parsedRequest.code))
   post "/compile":
@@ -97,7 +100,6 @@ routes:
     if request.params.len > 0:
       if request.params.hasKey("code"):
         parsedRequest.code = request.params["code"]
-        echo parsedRequest.code
     else:
       let parsed = parseJson(request.body)
       if getOrDefault(parsed, "code").isNil:
