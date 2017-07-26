@@ -1,4 +1,4 @@
-import jester, asyncdispatch, os, osproc, strutils, json, threadpool, asyncfile, asyncnet, posix, logging, nuuid, tables
+import jester, asyncdispatch, os, osproc, strutils, json, threadpool, asyncfile, asyncnet, posix, logging, nuuid, tables, httpclient
 
 type
   Config = object
@@ -57,12 +57,40 @@ proc prepareAndCompile(code: string, requestConfig: ptr RequestConfig): TaintedS
     ./docker_timeout.sh 20s -i -t --net=none -v "$1":/usercode virtual_machine /usercode/script.sh in.nim
     """ % requestConfig.tmpDir)
 
-proc compile(resp: Response, code: string, requestConfig: ptr RequestConfig): Future[string] =
+proc createGist(code: string): string =
+  let client = newHttpClient()
+  client.headers = newHttpHeaders({ "Content-Type": "application/json" })
+  let body = %*{
+    "description": "Snippet from https://play.nim-lang.org",
+    "public": true,
+    "files": {
+      "playground.nim": {
+        "content": code
+      }
+    }
+  }
+  let resp = client.request("https://api.github.com/gists", httpMethod = HttpPost, body = $body)
+  
+  let parsedResponse = parseJson(resp.bodyStream, "response.json")
+  return parsedResponse.getOrDefault("html_url").str
+
+
+
+
+proc compile(resp: jester.Response, code: string, requestConfig: ptr RequestConfig): Future[string] =
   echo requestConfig.tmpDir
   let fv = spawn prepareAndCompile(code, requestConfig)
   return respondOnReady(fv, requestConfig)
 
 routes:
+  post "/gist":
+    var parsedRequest: ParsedRequest
+    let parsed = parseJson(request.body)
+    if getOrDefault(parsed, "code").isNil:
+      resp(Http400, nil)
+    parsedRequest = to(parsed, ParsedRequest)
+    
+    resp(Http200, @[("Access-Control-Allow-Origin", "*"), ("Access-Control-Allow-Methods", "POST")], createGist(parsedRequest.code))
   post "/compile":
     var parsedRequest: ParsedRequest
 
