@@ -67,7 +67,7 @@ proc prepareAndCompile(code: string, requestConfig: ptr RequestConfig): TaintedS
 
 proc createGist(code: string): string =
   let client = newHttpClient()
-  echo "token " & apiToken.gist
+  
   client.headers = newHttpHeaders([("Content-Type", "application/json" ), ("Authorization", "token " & apiToken.gist)])
   let body = %*{
     "description": "Snippet from https://play.nim-lang.org",
@@ -83,7 +83,15 @@ proc createGist(code: string): string =
   let parsedResponse = parseJson(resp.bodyStream, "response.json")
   return parsedResponse.getOrDefault("html_url").str
 
+proc loadGist(gistId: string): string =
+  let client = newHttpClient()
 
+  client.headers = newHttpHeaders([("Content-Type", "application/json" ), ("Authorization", "token " & apiToken.gist)])
+
+  let resp = client.request("https://api.github.com/gists/$1" % gistId, httpMethod = HttpGet)
+  
+  let parsedResponse = parseJson(resp.bodyStream, "response.json")
+  return parsedResponse.getOrDefault("files").fields["playground.nim"].fields["content"].str
 
 
 proc compile(resp: jester.Response, code: string, requestConfig: ptr RequestConfig): Future[string] =
@@ -91,6 +99,9 @@ proc compile(resp: jester.Response, code: string, requestConfig: ptr RequestConf
   return respondOnReady(fv, requestConfig)
 
 routes:
+  get "/gist/@gistId":
+    resp(Http200, @[], loadGist(@"gistId"))
+
   post "/gist":
     var parsedRequest: ParsedRequest
     let parsed = parseJson(request.body)
