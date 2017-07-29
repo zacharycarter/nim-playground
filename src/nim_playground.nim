@@ -5,6 +5,9 @@ type
     tmpDir: string
     logFile: string
   
+  APIToken = object
+    gist: string
+  
   ParsedRequest = object
     code: string
 
@@ -12,6 +15,7 @@ type
     tmpDir: string
 
 const configFileName = "conf.json"
+const apiTokenFileName = "token.json"
 
 onSignal(SIGABRT):
   ## Handle SIGABRT from systemd
@@ -24,6 +28,10 @@ var conf = createShared(Config)
 let parsedConfig = parseFile(configFileName)
 conf.tmpDir = parsedConfig["tmp_dir"].str
 conf.logFile = parsedConfig["log_fname"].str
+
+var apiToken = createShared(APIToken)
+let parsedAPIToken = parseFile(apiTokenFileName)
+apiToken.gist = parsedAPIToken["gist"].str
 
 let fl = newFileLogger(conf.logFile, fmtStr = "$datetime $levelname ")
 fl.addHandler
@@ -59,7 +67,8 @@ proc prepareAndCompile(code: string, requestConfig: ptr RequestConfig): TaintedS
 
 proc createGist(code: string): string =
   let client = newHttpClient()
-  client.headers = newHttpHeaders({ "Content-Type": "application/json" })
+  echo "token " & apiToken.gist
+  client.headers = newHttpHeaders([("Content-Type", "application/json" ), ("Authorization", "token " & apiToken.gist)])
   let body = %*{
     "description": "Snippet from https://play.nim-lang.org",
     "public": true,
@@ -72,14 +81,12 @@ proc createGist(code: string): string =
   let resp = client.request("https://api.github.com/gists", httpMethod = HttpPost, body = $body)
   
   let parsedResponse = parseJson(resp.bodyStream, "response.json")
-  echo repr parsedResponse
   return parsedResponse.getOrDefault("html_url").str
 
 
 
 
 proc compile(resp: jester.Response, code: string, requestConfig: ptr RequestConfig): Future[string] =
-  echo requestConfig.tmpDir
   let fv = spawn prepareAndCompile(code, requestConfig)
   return respondOnReady(fv, requestConfig)
 
@@ -90,8 +97,6 @@ routes:
     if getOrDefault(parsed, "code").isNil:
       resp(Http400, nil)
     parsedRequest = to(parsed, ParsedRequest)
-
-    echo repr parsedRequest
     
     resp(Http200, @[("Access-Control-Allow-Origin", "*"), ("Access-Control-Allow-Methods", "POST")], createGist(parsedRequest.code))
   post "/compile":
@@ -116,3 +121,4 @@ routes:
 info "Starting!"
 runForever()
 freeShared(conf)
+freeShared(apiToken)
