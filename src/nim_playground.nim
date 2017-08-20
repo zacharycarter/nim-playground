@@ -68,7 +68,7 @@ proc prepareAndCompile(code: string, requestConfig: ptr RequestConfig): TaintedS
 proc createGist(code: string): string =
   let client = newHttpClient()
   
-  client.headers = newHttpHeaders([("Content-Type", "application/json" ), ("Authorization", "token " & apiToken.gist)])
+  client.headers = newHttpHeaders([("Content-Type", "application/json" )])
   let body = %*{
     "description": "Snippet from https://play.nim-lang.org",
     "public": true,
@@ -78,7 +78,7 @@ proc createGist(code: string): string =
       }
     }
   }
-  let resp = client.request("https://api.github.com/gists", httpMethod = HttpPost, body = $body)
+  let resp = client.request("https://api.github.com/gists?client_id=887dc07b67acec87e489&client_secret=$1" % apiToken.gist, httpMethod = HttpPost, body = $body)
   
   let parsedResponse = parseJson(resp.bodyStream, "response.json")
   return parsedResponse.getOrDefault("html_url").str
@@ -86,9 +86,9 @@ proc createGist(code: string): string =
 proc loadGist(gistId: string): string =
   let client = newHttpClient()
 
-  client.headers = newHttpHeaders([("Content-Type", "application/json" ), ("Authorization", "token " & apiToken.gist)])
+  client.headers = newHttpHeaders([("Content-Type", "application/json" )])
 
-  let resp = client.request("https://api.github.com/gists/$1" % gistId, httpMethod = HttpGet)
+  let resp = client.request("https://api.github.com/gists/$1?client_id=887dc07b67acec87e489&client_secret=$2" % [gistId, apiToken.gist], httpMethod = HttpGet)
   
   let parsedResponse = parseJson(resp.bodyStream, "response.json")
   return parsedResponse.getOrDefault("files").fields["playground.nim"].fields["content"].str
