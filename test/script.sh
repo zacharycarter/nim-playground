@@ -10,7 +10,7 @@ exec  < /dev/null
 chmod 777 /usercode/logfile.txt
 chmod 777 /usercode/errors.txt
 
-nim c /usercode/$file
+nim $compilationTarget /usercode/$file
 if [ $? -eq 0 ];	then
     ./usercode/${file/.nim/""}
 else
