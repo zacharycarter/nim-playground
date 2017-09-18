@@ -123,6 +123,8 @@ routes:
       let parsed = parseJson(request.body)
       if getOrDefault(parsed, "code").isNil:
         resp(Http400, nil)
+      if getOrDefault(parsed, "compilationTarget").isNil:
+        resp(Http400, nil)
       parsedRequest = to(parsed, ParsedRequest)
 
     let requestConfig = createShared(RequestConfig)
