@@ -10,6 +10,7 @@ type
   
   ParsedRequest = object
     code: string
+    compilationTarget: string
 
   RequestConfig = object
     tmpDir: string
@@ -56,14 +57,14 @@ proc respondOnReady(fv: FlowVar[TaintedString], requestConfig: ptr RequestConfig
 
     await sleepAsync(500)
 
-proc prepareAndCompile(code: string, requestConfig: ptr RequestConfig): TaintedString =
+proc prepareAndCompile(code, compilationTarget: string, requestConfig: ptr RequestConfig): TaintedString =
   discard existsOrCreateDir(requestConfig.tmpDir)
   copyFileWithPermissions("./test/script.sh", "$1/script.sh" % requestConfig.tmpDir)
   writeFile("$1/in.nim" % requestConfig.tmpDir, code)
 
   execProcess("""
-    ./docker_timeout.sh 20s -i -t --net=none -v "$1":/usercode virtual_machine /usercode/script.sh in.nim
-    """ % requestConfig.tmpDir)
+    ./docker_timeout.sh 20s -i -t --net=none -v "$1":/usercode virtual_machine /usercode/script.sh in.nim $2
+    """ % [requestConfig.tmpDir, compilationTarget]) 
 
 proc createGist(code: string): string =
   let client = newHttpClient()
@@ -94,8 +95,8 @@ proc loadGist(gistId: string): string =
   return parsedResponse.getOrDefault("files").fields["playground.nim"].fields["content"].str
 
 
-proc compile(resp: jester.Response, code: string, requestConfig: ptr RequestConfig): Future[string] =
-  let fv = spawn prepareAndCompile(code, requestConfig)
+proc compile(resp: jester.Response, code, compilationTarget: string, requestConfig: ptr RequestConfig): Future[string] =
+  let fv = spawn prepareAndCompile(code, compilationTarget, requestConfig)
   return respondOnReady(fv, requestConfig)
 
 routes:
@@ -116,6 +117,8 @@ routes:
     if request.params.len > 0:
       if request.params.hasKey("code"):
         parsedRequest.code = request.params["code"]
+      if request.params.hasKey("compilationTarget"):
+        parsedRequest.compilationTarget = request.params["compilationTarget"]
     else:
       let parsed = parseJson(request.body)
       if getOrDefault(parsed, "code").isNil:
@@ -124,7 +127,7 @@ routes:
 
     let requestConfig = createShared(RequestConfig)
     requestConfig.tmpDir = conf.tmpDir & "/" & generateUUID()
-    let result = await response.compile(parsedRequest.code, requestConfig)
+    let result = await response.compile(parsedRequest.code, parsedRequest.compilationTarget, requestConfig)
     
     resp(Http200, @[("Access-Control-Allow-Origin", "*"), ("Access-Control-Allow-Methods", "POST")], result)
     
