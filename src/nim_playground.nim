@@ -95,19 +95,19 @@ proc loadGist(gistId: string): string =
   return parsedResponse.getOrDefault("files").fields["playground.nim"].fields["content"].str
 
 
-proc compile(resp: jester.Response, code, compilationTarget: string, requestConfig: ptr RequestConfig): Future[string] =
+proc compile(code, compilationTarget: string, requestConfig: ptr RequestConfig): Future[string] =
   let fv = spawn prepareAndCompile(code, compilationTarget, requestConfig)
   return respondOnReady(fv, requestConfig)
 
 routes:
   get "/gist/@gistId":
-    resp(Http200, @[], loadGist(@"gistId"))
+    resp(Http200, loadGist(@"gistId"))
 
   post "/gist":
     var parsedRequest: ParsedRequest
     let parsed = parseJson(request.body)
     if getOrDefault(parsed, "code").isNil:
-      resp(Http400, nil)
+      resp(Http400)
     parsedRequest = to(parsed, ParsedRequest)
     
     resp(Http200, @[("Access-Control-Allow-Origin", "*"), ("Access-Control-Allow-Methods", "POST")], createGist(parsedRequest.code))
@@ -122,16 +122,16 @@ routes:
     else:
       let parsed = parseJson(request.body)
       if getOrDefault(parsed, "code").isNil:
-        resp(Http400, nil)
+        resp(Http400)
       if getOrDefault(parsed, "compilationTarget").isNil:
-        resp(Http400, nil)
+        resp(Http400)
       parsedRequest = to(parsed, ParsedRequest)
 
     let requestConfig = createShared(RequestConfig)
     requestConfig.tmpDir = conf.tmpDir & "/" & generateUUID()
-    let result = await response.compile(parsedRequest.code, parsedRequest.compilationTarget, requestConfig)
+    let compileResult = await compile(parsedRequest.code, parsedRequest.compilationTarget, requestConfig)
     
-    resp(Http200, @[("Access-Control-Allow-Origin", "*"), ("Access-Control-Allow-Methods", "POST")], result)
+    resp(Http200, [("Access-Control-Allow-Origin", "*"), ("Access-Control-Allow-Methods", "POST")], compileResult)
     
 
 info "Starting!"
