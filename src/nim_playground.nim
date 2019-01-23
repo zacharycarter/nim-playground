@@ -16,7 +16,7 @@ type
     tmpDir: string
 
 const configFileName = "conf.json"
-const apiTokenFileName = "token.json"
+# const apiTokenFileName = "token.json"
 
 onSignal(SIGABRT):
   ## Handle SIGABRT from systemd
@@ -30,9 +30,9 @@ let parsedConfig = parseFile(configFileName)
 conf.tmpDir = parsedConfig["tmp_dir"].str
 conf.logFile = parsedConfig["log_fname"].str
 
-var apiToken = createShared(APIToken)
-let parsedAPIToken = parseFile(apiTokenFileName)
-apiToken.gist = parsedAPIToken["gist"].str
+# var apiToken = createShared(APIToken)
+# let parsedAPIToken = parseFile(apiTokenFileName)
+# apiToken.gist = parsedAPIToken["gist"].str
 
 let fl = newFileLogger(conf.logFile, fmtStr = "$datetime $levelname ")
 fl.addHandler
@@ -66,33 +66,33 @@ proc prepareAndCompile(code, compilationTarget: string, requestConfig: ptr Reque
     ./docker_timeout.sh 20s -i -t --net=none -v "$1":/usercode virtual_machine /usercode/script.sh in.nim $2
     """ % [requestConfig.tmpDir, compilationTarget]) 
 
-proc createGist(code: string): string =
-  let client = newHttpClient()
+# proc createGist(code: string): string =
+#   let client = newHttpClient()
   
-  client.headers = newHttpHeaders([("Content-Type", "application/json" )])
-  let body = %*{
-    "description": "Snippet from https://play.nim-lang.org",
-    "public": true,
-    "files": {
-      "playground.nim": {
-        "content": code
-      }
-    }
-  }
-  let resp = client.request("https://api.github.com/gists?client_id=887dc07b67acec87e489&client_secret=$1" % apiToken.gist, httpMethod = HttpPost, body = $body)
+#   client.headers = newHttpHeaders([("Content-Type", "application/json" )])
+#   let body = %*{
+#     "description": "Snippet from https://play.nim-lang.org",
+#     "public": true,
+#     "files": {
+#       "playground.nim": {
+#         "content": code
+#       }
+#     }
+#   }
+#   let resp = client.request("https://api.github.com/gists?client_id=887dc07b67acec87e489&client_secret=$1" % apiToken.gist, httpMethod = HttpPost, body = $body)
   
-  let parsedResponse = parseJson(resp.bodyStream, "response.json")
-  return parsedResponse.getOrDefault("html_url").str
+#   let parsedResponse = parseJson(resp.bodyStream, "response.json")
+#   return parsedResponse.getOrDefault("html_url").str
 
-proc loadGist(gistId: string): string =
-  let client = newHttpClient()
+# proc loadGist(gistId: string): string =
+#   let client = newHttpClient()
 
-  client.headers = newHttpHeaders([("Content-Type", "application/json" )])
+#   client.headers = newHttpHeaders([("Content-Type", "application/json" )])
 
-  let resp = client.request("https://api.github.com/gists/$1?client_id=887dc07b67acec87e489&client_secret=$2" % [gistId, apiToken.gist], httpMethod = HttpGet)
+#   let resp = client.request("https://api.github.com/gists/$1?client_id=887dc07b67acec87e489&client_secret=$2" % [gistId, apiToken.gist], httpMethod = HttpGet)
   
-  let parsedResponse = parseJson(resp.bodyStream, "response.json")
-  return parsedResponse.getOrDefault("files").fields["playground.nim"].fields["content"].str
+#   let parsedResponse = parseJson(resp.bodyStream, "response.json")
+#   return parsedResponse.getOrDefault("files").fields["playground.nim"].fields["content"].str
 
 
 proc compile(code, compilationTarget: string, requestConfig: ptr RequestConfig): Future[string] =
@@ -137,4 +137,4 @@ routes:
 info "Starting!"
 runForever()
 freeShared(conf)
-freeShared(apiToken)
+# freeShared(apiToken)
