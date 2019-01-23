@@ -6,6 +6,7 @@ description   = "API for play.nim-lang.org"
 license       = "MIT"
 
 srcdir        = "src"
+bin           = @["nim_playground"]
 
 # Dependencies
 
