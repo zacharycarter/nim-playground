@@ -100,17 +100,17 @@ proc compile(code, compilationTarget: string, requestConfig: ptr RequestConfig):
   return respondOnReady(fv, requestConfig)
 
 routes:
-  get "/gist/@gistId":
-    resp(Http200, loadGist(@"gistId"))
+  # get "/gist/@gistId":
+  #   resp(Http200, loadGist(@"gistId"))
 
-  post "/gist":
-    var parsedRequest: ParsedRequest
-    let parsed = parseJson(request.body)
-    if getOrDefault(parsed, "code").isNil:
-      resp(Http400)
-    parsedRequest = to(parsed, ParsedRequest)
+  # post "/gist":
+  #   var parsedRequest: ParsedRequest
+  #   let parsed = parseJson(request.body)
+  #   if getOrDefault(parsed, "code").isNil:
+  #     resp(Http400)
+  #   parsedRequest = to(parsed, ParsedRequest)
     
-    resp(Http200, @[("Access-Control-Allow-Origin", "*"), ("Access-Control-Allow-Methods", "POST")], createGist(parsedRequest.code))
+  #   resp(Http200, @[("Access-Control-Allow-Origin", "*"), ("Access-Control-Allow-Methods", "POST")], createGist(parsedRequest.code))
   post "/compile":
     var parsedRequest: ParsedRequest
 
