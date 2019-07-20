@@ -1,4 +1,4 @@
-import jester, asyncdispatch, os, osproc, strutils, json, threadpool, asyncfile, asyncnet, posix, logging, nuuid, tables, httpclient
+import jester, asyncdispatch, os, osproc, strutils, json, threadpool, asyncfile, asyncnet, posix, logging, nuuid, tables, httpclient, cgi
 
 type
   Config = object
@@ -44,8 +44,8 @@ proc respondOnReady(fv: FlowVar[TaintedString], requestConfig: ptr RequestConfig
       
       var errorsFile = openAsync("$1/errors.txt" % requestConfig.tmpDir, fmReadWrite)
       var logFile = openAsync("$1/logfile.txt" % requestConfig.tmpDir, fmReadWrite)
-      var errors = await errorsFile.readAll()
-      var log = await logFile.readAll()
+      var errors = await errorsFile.readAll().xmlEncode()
+      var log = await logFile.readAll().xmlEncode()
       
       var ret = %* {"compileLog": errors, "log": log}
       
